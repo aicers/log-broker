@@ -1,0 +1,23 @@
+[package]
+name = "log-broker"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0"
+bb8-redis = "0.13"
+lazy_static = "1.4"
+tokio = { version = "1", features = ["sync"] }
+tracing = "0.1"
+tracing-appender = "0.2"
+tracing-subscriber = { version = "0.3", features = [
+  "env-filter",
+  "fmt",
+  "std",
+  "json"
+] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
