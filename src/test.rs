@@ -19,7 +19,7 @@ async fn test_racing() {
     tokio::spawn(init_redis_connection(ip_addr, port, client_id.clone()));
     tokio::spawn(init_redis_connection(ip_addr, port, client_id.clone()));
     tokio::spawn(init_redis_connection(ip_addr, port, client_id.clone()));
-    tokio::spawn(init_redis_connection(ip_addr, port, client_id.clone())); // many times
+    tokio::spawn(init_redis_connection(ip_addr, port, client_id.clone()));
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
