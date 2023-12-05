@@ -209,18 +209,26 @@ pub async fn init_redis_connection(
     let manager = RedisConnectionManager::new(format!("redis://{ip_addr}:{port}"))?;
     let pool = Pool::builder().build(manager).await?;
 
-    let mut id = CLIENT_ID.write().await;
-    *id = client_id;
-    let mut redis_pool = REDIS_POOL.write().await;
-    *redis_pool = Some(pool);
+    let mut pool_lock = REDIS_POOL
+        .try_write()
+        .map_err(|e| anyhow!("Redis pool error: {}", e))?;
+    *pool_lock = Some(pool);
+
+    let mut client_id_lock = CLIENT_ID
+        .try_write()
+        .map_err(|e| anyhow!("Redis client id error: {}", e))?;
+    *client_id_lock = client_id;
 
     Ok(())
 }
 
 #[allow(dead_code)]
 async fn log_to_redis(log: &str) -> anyhow::Result<()> {
-    let pool = REDIS_POOL.read().await;
-    let client_id = CLIENT_ID.read().await;
+    let pool_lock = REDIS_POOL.clone();
+    let client_id_lock = CLIENT_ID.clone();
+
+    let pool = pool_lock.read().await;
+    let client_id = client_id_lock.read().await;
 
     match pool.clone() {
         Some(pool) => {
@@ -231,11 +239,13 @@ async fn log_to_redis(log: &str) -> anyhow::Result<()> {
                 .query_async::<_, ()>(&mut *conn)
                 .await
                 .map_err(|e| anyhow!("Can't set log: {}", e));
-
-            Ok(())
         }
-        None => Err(anyhow!("Redis pool is not initialized")),
+        None => return Err(anyhow!("Redis pool is not initialized")),
     }
+
+    drop(pool);
+    drop(client_id);
+    Ok(())
 }
 
 /// Init operation log with tracing

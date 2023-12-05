@@ -4,24 +4,48 @@ use crate::{
 };
 use anyhow::{anyhow, Result};
 use bb8_redis::redis::cmd;
+use serial_test::serial;
 use std::{net::IpAddr, path::Path};
 
-#[tokio::test]
-async fn test_init_redis_connection() {
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+#[serial]
+async fn test_racing() {
     let ip_addr = IpAddr::from([127, 0, 0, 1]);
     let port = 6379;
+    let client_id = "test_connection_racing".to_string();
+
+    tokio::spawn(init_redis_connection(ip_addr, port, client_id.clone()));
+    tokio::spawn(init_redis_connection(ip_addr, port, client_id.clone()));
+    tokio::spawn(init_redis_connection(ip_addr, port, client_id.clone()));
+    tokio::spawn(init_redis_connection(ip_addr, port, client_id.clone()));
+    tokio::spawn(init_redis_connection(ip_addr, port, client_id.clone()));
+    tokio::spawn(init_redis_connection(ip_addr, port, client_id.clone())); // many times
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[serial]
+async fn test_race_condition() {
+    let ip_addr = IpAddr::from([127, 0, 0, 1]);
+    let port = 6379;
+
     let client_id = "test_connection".to_string();
     let _ = init_redis_connection(ip_addr, port, client_id)
         .await
         .map_err(|e| e.to_string());
+
     let pool = REDIS_POOL.read().await;
+    let client_id = "test_connection".to_string();
+    let _ = init_redis_connection(ip_addr, port, client_id)
+        .await
+        .map_err(|e| e.to_string());
 
     assert!(pool.is_some());
     let client_id = CLIENT_ID.read().await;
     assert_eq!(*client_id, "test_connection".to_string());
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[serial]
 async fn test_log_to_redis() -> Result<()> {
     let ip_addr = IpAddr::from([127, 0, 0, 1]);
     let port = 6379;
@@ -55,7 +79,8 @@ async fn test_log_to_redis() -> Result<()> {
     }
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 3)]
+#[serial]
 async fn test_macros() -> Result<()> {
     let path = Path::new("./");
     let pkg_name = "test_macros";
