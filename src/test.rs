@@ -1,11 +1,39 @@
 use crate::{
-    debug, error, info, init_redis_connection, init_tracing, log_to_redis, trace, warn,
-    LogLocation, CLIENT_ID, REDIS_POOL,
+    debug, error, info, init_redis_connection, init_redis_connection_with_options, init_tracing,
+    log_to_redis, trace, warn, LogLocation, RedisConnPoolOptions, CLIENT_ID, REDIS_POOL,
 };
 use anyhow::{anyhow, Result};
-use bb8_redis::redis::cmd;
+use bb8_redis::{redis::cmd, RedisConnectionManager};
 use serial_test::serial;
-use std::{net::IpAddr, path::Path};
+use std::{net::IpAddr, path::Path, time::Duration};
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[serial]
+async fn test_check_valid_address() {
+    let ip_addr = IpAddr::from([127, 0, 0, 1]);
+    let port = 6379;
+    let client_id = "test_non_existing_connection".to_string();
+    let pool_options = RedisConnPoolOptions::<RedisConnectionManager>::default()
+        .connection_timeout(Duration::from_secs(10));
+
+    let result =
+        init_redis_connection_with_options(ip_addr, port, client_id.clone(), Some(pool_options))
+            .await
+            .map_err(|e| e.to_string());
+
+    assert!(result.is_ok());
+
+    let ip_addr = IpAddr::from([127, 0, 0, 5]);
+    let port = 000;
+    let pool_options = RedisConnPoolOptions::<RedisConnectionManager>::default()
+        .connection_timeout(Duration::from_secs(10));
+
+    let result = init_redis_connection_with_options(ip_addr, port, client_id, Some(pool_options))
+        .await
+        .map_err(|e| e.to_string());
+
+    assert!(result.is_err());
+}
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 #[serial]
