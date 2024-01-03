@@ -3,15 +3,17 @@
 A library that supports five logging levels: ERROR, WARNING, INFO, TRACING,
 and DEBUG. The log broker forwards these logs to either a Redis server,
 to a local log file, or both. When forwarded to a a Redis server, it will
-be formatted to a JSON whilst when forwarded to a log file it will be formated
+be formatted to a JSON whilst when forwarded to a log file it will be formatted
 as a log from the tracing library.
 
 ## Usage
 
 ```rs
+    use log_broker::LogLocation;
+
     // To initialize tracing to a local file when given a valid path
     // and package name
-    // Note: cannot be `_` otherwise the WokerGuard will immediately
+    // Note: cannot be `_` otherwise the WorkerGuard will immediately
     // be consumed
     let _guard = init_tracing(path, pkg_name)?;
 
@@ -30,7 +32,7 @@ as a log from the tracing library.
     trace!(LogLocation::Local, "{}", trace_log);
 
     // Debug log logs to Redis server initialized above
-    debug!(LogLocation::Local, "{}", debug_log);
+    debug!(LogLocation::Redis, "{}", debug_log);
 
     // Info log logs to both local and Redis server
     info!(LogLocation::Both, "{}", info_log);

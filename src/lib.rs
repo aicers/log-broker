@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod test;
+
 use anyhow::{anyhow, bail, Ok, Result};
 use bb8_redis::{
     bb8::{CustomizeConnection, ErrorSink, ManageConnection, NopErrorSink, Pool, QueueStrategy},
@@ -7,20 +10,18 @@ use bb8_redis::{
 use lazy_static::lazy_static;
 use std::{fs::File, net::IpAddr, path::Path, sync::Arc, time::Duration};
 use tokio::sync::RwLock;
+pub use tracing;
 use tracing::metadata::LevelFilter;
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::{
     fmt, prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer,
 };
 
-#[cfg(test)]
-mod test;
-
 /// trace! macro
 ///
 /// Constructs a new message at the trace level with the given format string and
 /// a desired log location of either to a Redis connection, log file or both.
-/// This functions similary to the trace! macro.
+/// This functions similarly to the trace! macro.
 ///
 /// # Examples
 ///
@@ -34,16 +35,20 @@ macro_rules! trace {
     ($location:expr,$($arg:tt)*) => {
         match $location {
             LogLocation::Local => {
-                tracing::trace!($($arg)*);
+                $crate::tracing::trace!($($arg)*);
             }
             LogLocation::Redis => {
                 let log = format!($($arg)*);
-                let _ = log_to_redis(&log).await;
+                tokio::spawn(async move {
+                    let _ = $crate::log_to_redis(&log).await;
+                });
             }
             LogLocation::Both => {
-                tracing::trace!($($arg)*);
+                $crate::tracing::trace!($($arg)*);
                 let log = format!($($arg)*);
-                let _ = log_to_redis(&log).await;
+                tokio::spawn(async move {
+                    let _ = $crate::log_to_redis(&log).await;
+                });
             }
         }
     };
@@ -53,7 +58,7 @@ macro_rules! trace {
 ///
 /// Constructs a new message at the debug level with the given format string and
 /// a desired log location of either to a Redis connection, log file or both.
-/// This functions similary to the debug! macro.
+/// This functions similarly to the debug! macro.
 ///
 /// # Examples
 ///
@@ -67,16 +72,20 @@ macro_rules! debug {
     ($location:expr,$($arg:tt)*) => {
         match $location {
             LogLocation::Local => {
-                tracing::debug!($($arg)*);
+                $crate::tracing::debug!($($arg)*);
             }
             LogLocation::Redis => {
                 let log = format!($($arg)*);
-                let _ = log_to_redis(&log).await;
+                tokio::spawn(async move {
+                    let _ = $crate::log_to_redis(&log).await;
+                });
             }
             LogLocation::Both => {
-                tracing::debug!($($arg)*);
+                $crate::tracing::debug!($($arg)*);
                 let log = format!($($arg)*);
-                let _ = log_to_redis(&log).await;
+                tokio::spawn(async move {
+                    let _ = $crate::log_to_redis(&log).await;
+                });
             }
         }
     };
@@ -86,7 +95,7 @@ macro_rules! debug {
 ///
 /// Constructs a new message at the info level with the given format string and
 /// a desired log location of either to a Redis connection, log file or both.
-/// This functions similary to the info! macro.
+/// This functions similarly to the info! macro.
 ///
 /// # Examples
 ///
@@ -100,27 +109,30 @@ macro_rules! info {
     ($location:expr,$($arg:tt)*) => {
         match $location {
             LogLocation::Local => {
-                tracing::info!($($arg)*);
+                $crate::tracing::info!($($arg)*);
             }
             LogLocation::Redis => {
                 let log = format!($($arg)*);
-                let _ = log_to_redis(&log).await;
+                tokio::spawn(async move {
+                    let _ = $crate::log_to_redis(&log).await;
+                });
             }
             LogLocation::Both => {
-                tracing::info!($($arg)*);
+                $crate::tracing::info!($($arg)*);
                 let log = format!($($arg)*);
-                let _ = log_to_redis(&log).await;
+                tokio::spawn(async move {
+                    let _ = $crate::log_to_redis(&log).await;
+                });
             }
         }
     };
-
 }
 
 /// warn! macro
 ///
 /// Constructs a new message at the warn level with the given format string and
 /// a desired log location of either to a Redis connection, log file or both.
-/// This functions similary to the warn! macro.
+/// This functions similarly to the warn! macro.
 ///
 /// # Examples
 ///
@@ -134,27 +146,30 @@ macro_rules! warn {
     ($location:expr,$($arg:tt)*) => {
         match $location {
             LogLocation::Local => {
-                tracing::warn!($($arg)*);
+                $crate::tracing::warn!($($arg)*);
             }
             LogLocation::Redis => {
                 let log = format!($($arg)*);
-                let _ = log_to_redis(&log).await;
+                tokio::spawn(async move {
+                    let _ = $crate::log_to_redis(&log).await;
+                });
             }
             LogLocation::Both => {
-                tracing::warn!($($arg)*);
+                $crate::tracing::warn!($($arg)*);
                 let log = format!($($arg)*);
-                let _ = log_to_redis(&log).await;
+                tokio::spawn(async move {
+                    let _ = $crate::log_to_redis(&log).await;
+                });
             }
         }
     };
-
 }
 
 /// error! macro
 ///
 /// Constructs a new message at the error level with the given format string and
 /// a desired log location of either to a Redis connection, log file or both.
-/// This functions similary to the error! macro.
+/// This functions similarly to the error! macro.
 ///
 /// # Examples
 ///
@@ -168,16 +183,20 @@ macro_rules! error {
     ($location:expr,$($arg:tt)*) => {
         match $location {
             LogLocation::Local => {
-                tracing::error!($($arg)*);
+                $crate::tracing::error!($($arg)*);
             }
             LogLocation::Redis => {
                 let log = format!($($arg)*);
-                let _ = log_to_redis(&log).await;
+                tokio::spawn(async move {
+                    let _ = $crate::log_to_redis(&log).await;
+                });
             }
             LogLocation::Both => {
-                tracing::error!($($arg)*);
+                $crate::tracing::error!($($arg)*);
                 let log = format!($($arg)*);
-                let _ = log_to_redis(&log).await;
+                tokio::spawn(async move {
+                    let _ = $crate::log_to_redis(&log).await;
+                });
             }
         }
     };
@@ -252,7 +271,7 @@ impl<M: ManageConnection> RedisConnPoolOptions<M> {
     }
 
     #[must_use]
-    pub fn max_lifetimeidle_timeout(mut self, idle_timeout: Option<Duration>) -> Self {
+    pub fn idle_timeout(mut self, idle_timeout: Option<Duration>) -> Self {
         self.idle_timeout = idle_timeout;
         self
     }
@@ -382,7 +401,6 @@ pub async fn init_redis_connection_with_options(
     }
 }
 
-#[allow(dead_code)]
 async fn build_pool_with_options<M: ManageConnection>(
     manager: M,
     pool_options: Option<RedisConnPoolOptions<M>>,
@@ -407,8 +425,12 @@ async fn build_pool_with_options<M: ManageConnection>(
     builder.build(manager).await
 }
 
-#[allow(dead_code)]
-async fn log_to_redis(log: &str) -> anyhow::Result<()> {
+/// Expanded macro calls this function.
+///
+/// # Errors
+///
+/// * Redis error
+pub async fn log_to_redis(log: &str) -> anyhow::Result<()> {
     let pool = REDIS_POOL.read().await;
 
     match &*pool {
