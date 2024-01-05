@@ -40,14 +40,14 @@ macro_rules! trace {
             LogLocation::Redis => {
                 let log = format!($($arg)*);
                 tokio::spawn(async move {
-                    let _ = $crate::log_to_redis(&log).await;
+                    let _ = $crate::log_to_redis("TRACE", &log).await;
                 });
             }
             LogLocation::Both => {
                 $crate::tracing::trace!($($arg)*);
                 let log = format!($($arg)*);
                 tokio::spawn(async move {
-                    let _ = $crate::log_to_redis(&log).await;
+                    let _ = $crate::log_to_redis("TRACE", &log).await;
                 });
             }
         }
@@ -77,14 +77,14 @@ macro_rules! debug {
             LogLocation::Redis => {
                 let log = format!($($arg)*);
                 tokio::spawn(async move {
-                    let _ = $crate::log_to_redis(&log).await;
+                    let _ = $crate::log_to_redis("DEBUG", &log).await;
                 });
             }
             LogLocation::Both => {
                 $crate::tracing::debug!($($arg)*);
                 let log = format!($($arg)*);
                 tokio::spawn(async move {
-                    let _ = $crate::log_to_redis(&log).await;
+                    let _ = $crate::log_to_redis("DEBUG", &log).await;
                 });
             }
         }
@@ -114,14 +114,14 @@ macro_rules! info {
             LogLocation::Redis => {
                 let log = format!($($arg)*);
                 tokio::spawn(async move {
-                    let _ = $crate::log_to_redis(&log).await;
+                    let _ = $crate::log_to_redis("INFO", &log).await;
                 });
             }
             LogLocation::Both => {
                 $crate::tracing::info!($($arg)*);
                 let log = format!($($arg)*);
                 tokio::spawn(async move {
-                    let _ = $crate::log_to_redis(&log).await;
+                    let _ = $crate::log_to_redis("INFO", &log).await;
                 });
             }
         }
@@ -151,14 +151,14 @@ macro_rules! warn {
             LogLocation::Redis => {
                 let log = format!($($arg)*);
                 tokio::spawn(async move {
-                    let _ = $crate::log_to_redis(&log).await;
+                    let _ = $crate::log_to_redis("WARN", &log).await;
                 });
             }
             LogLocation::Both => {
                 $crate::tracing::warn!($($arg)*);
                 let log = format!($($arg)*);
                 tokio::spawn(async move {
-                    let _ = $crate::log_to_redis(&log).await;
+                    let _ = $crate::log_to_redis("WARN", &log).await;
                 });
             }
         }
@@ -188,14 +188,14 @@ macro_rules! error {
             LogLocation::Redis => {
                 let log = format!($($arg)*);
                 tokio::spawn(async move {
-                    let _ = $crate::log_to_redis(&log).await;
+                    let _ = $crate::log_to_redis("ERROR", &log).await;
                 });
             }
             LogLocation::Both => {
                 $crate::tracing::error!($($arg)*);
                 let log = format!($($arg)*);
                 tokio::spawn(async move {
-                    let _ = $crate::log_to_redis(&log).await;
+                    let _ = $crate::log_to_redis("ERROR", &log).await;
                 });
             }
         }
@@ -430,7 +430,11 @@ async fn build_pool_with_options<M: ManageConnection>(
 /// # Errors
 ///
 /// * Redis error
-pub async fn log_to_redis(log: &str) -> anyhow::Result<()> {
+pub async fn log_to_redis(log_level: &str, log: &str) -> anyhow::Result<()> {
+    let now = chrono::Utc::now();
+    let formatted = now.format("%Y-%m-%dT%H:%M:%S%.6fZ");
+    let log = format!("{formatted}\t{log_level}\t{log}");
+
     let pool = REDIS_POOL.read().await;
 
     match &*pool {
@@ -439,7 +443,7 @@ pub async fn log_to_redis(log: &str) -> anyhow::Result<()> {
             let client_id = CLIENT_ID.read().await;
             let _ = cmd("RPUSH")
                 .arg(client_id.clone())
-                .arg(log.to_owned())
+                .arg(log)
                 .query_async::<_, ()>(&mut *conn)
                 .await
                 .map_err(|e| anyhow!("Can't set log: {}", e));

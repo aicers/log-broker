@@ -7,7 +7,8 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0"
-bb8-redis = "0.13"
+bb8-redis = "0.14"
+chrono = "0.4"
 lazy_static = "1.4"
 tokio = { version = "1", features = ["sync"] }
 tracing = "0.1"
